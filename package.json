@@ -1,0 +1,42 @@
+{
+  "name": "astro-openvscode-inspector",
+  "version": "1.0.0",
+  "description": "VSCode inspector integration for Astro DevToolbar - Open files directly from browser",
+  "main": "index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js"
+  },
+  "keywords": [
+    "astro",
+    "vscode",
+    "inspector",
+    "devtools",
+    "development",
+    "integration"
+  ],
+  "author": "Seu Nome <seu.email@exemplo.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VamoCodar/astro-openvscode-inspector.git"
+  },
+  "bugs": {
+    "url": "https://github.com/VamoCodar/astro-openvscode-inspector/issues"
+  },
+  "homepage": "https://github.com/VamoCodar/astro-openvscode-inspector#readme",
+  "peerDependencies": {
+    "astro": "^5.0.0"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "^1.7.4"
+  },
+  "files": [
+    "index.js",
+    "toolbar-app.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
