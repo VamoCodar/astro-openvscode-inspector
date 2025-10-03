@@ -3,11 +3,14 @@ import { computePosition, flip, shift, offset, arrow } from "@floating-ui/dom";
 
 export default defineToolbarApp({
   init(canvas, app, server) {
+    let projectFolder;
     let isInspectorMode = false;
     let highlightedElement = null;
     let tooltip = null;
 
-    const projectFolder = app?.config?.toolbar?.projectFolder;
+    server.on("set-project-folder", ({ projectFolder }) => {
+      projectFolder = projectFolder;
+    });
 
     // Criar o elemento tooltip
     function createTooltip() {

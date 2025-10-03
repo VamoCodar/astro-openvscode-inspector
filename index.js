@@ -67,7 +67,11 @@ export default function astroVSCodeInspector(options = {}) {
           name,
           icon,
           entrypoint: new URL("./toolbar-app.js", import.meta.url).href,
-          projectFolder,
+        });
+      },
+      "astro:server:setup": ({ toolbar }) => {
+        toolbar.onAppInitialized("astro:vscode:inspector", () => {
+          toolbar.send("set-project-folder", { projectFolder });
         });
       },
     },
