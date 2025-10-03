@@ -7,7 +7,7 @@ export default defineToolbarApp({
     let highlightedElement = null;
     let tooltip = null;
 
-    const getProjectFolder = () => window?.__ASTRO_VSCODE_PROJECT_FOLDER__;
+    const projectFolder = app?.config?.toolbar?.projectFolder;
 
     // Criar o elemento tooltip
     function createTooltip() {
@@ -187,7 +187,7 @@ export default defineToolbarApp({
 
       if (line && relativePath) {
         const normalizedPath = relativePath.replace(/\\\\/g, "/");
-        const projectRoot = getProjectFolder();
+        const projectRoot = projectFolder;
         const absolutePath = projectRoot + normalizedPath;
         const vscodeUrl = `vscode://file/${absolutePath}:${line}:${column}`;
 

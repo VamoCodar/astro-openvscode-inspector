@@ -19,8 +19,8 @@ pnpm add astro-openvscode-inspector
 
 Dependencies
 This package requires:
-
 @floating-ui/dom for tooltip positioning (automatically installed)
+
 Usage
 Add the integration to your astro.config.mjs:
 

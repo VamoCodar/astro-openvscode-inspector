@@ -1,0 +1,7 @@
+.git/
+.vscode/
+*.log
+.env
+.env.local
+test/
+docs/

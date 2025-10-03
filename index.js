@@ -62,22 +62,12 @@ export default function astroVSCodeInspector(options = {}) {
     name: "astro-vscode-inspector",
     hooks: {
       "astro:config:setup": ({ addDevToolbarApp, injectScript }) => {
-        // Injeta o projectFolder como uma variável global
-        if (projectFolder) {
-          injectScript(
-            "page",
-            `window.__ASTRO_VSCODE_PROJECT_FOLDER__ = "${projectFolder.replace(
-              /\\/g,
-              "/",
-            )}"`,
-          );
-        }
-
         addDevToolbarApp({
           id,
           name,
           icon,
           entrypoint: new URL("./toolbar-app.js", import.meta.url).href,
+          projectFolder,
         });
       },
     },
