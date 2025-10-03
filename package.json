@@ -1,6 +1,6 @@
 {
   "name": "astro-openvscode-inspector",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "VSCode inspector integration for Astro DevToolbar - Open files directly from browser",
   "main": "index.js",
   "type": "module",
