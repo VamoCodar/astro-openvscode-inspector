@@ -8,8 +8,8 @@ export default defineToolbarApp({
     let highlightedElement = null;
     let tooltip = null;
 
-    server.on("set-project-folder", ({ projectFolder }) => {
-      projectFolder = projectFolder;
+    server.on("set-project-folder", ({ projectFolder: folder }) => {
+      projectFolder = folder
     });
 
     // Criar o elemento tooltip
