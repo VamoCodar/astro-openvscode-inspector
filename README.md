@@ -6,44 +6,59 @@ A seamless integration between Astro's DevToolbar and VSCode that allows you to 
 
 - 🎯 **Click to open** - Click on any component to open it in VSCode
 - 🖱️ **Smart tooltip** - Hover to see component information with beautiful floating tooltips
-- 🎨 **Visual highlighting** - Clear visual feedback when hovering over components  
+- 🎨 **Visual highlighting** - Clear visual feedback when hovering over components
 - ⚡ **Automatic detection** - Finds inspector elements up to 20 levels deep
 - 🔄 **Auto-close** - Inspector mode automatically closes after opening a file
 
 ## Installation
 
 ```bash
+# requirements
+npm install @react-dev-inspector/babel-plugin vite 
+```
+```bash
 npm install astro-openvscode-inspector
-# or
-pnpm add astro-openvscode-inspector
+```
 
-Dependencies
-This package requires:
-@floating-ui/dom for tooltip positioning (automatically installed)
+## Dependencies
 
-Usage
+This package requires: 
+
+@floating-ui/dom<br>
+vite<br>
+@react-dev-inspector/babel-plugin<br>
+
+## Usage
 Add the integration to your astro.config.mjs:
 
 ```js
-import { defineConfig } from 'astro/config'
-import astroVSCodeInspector from 'astro-openvscode-inspector'
+import { defineConfig } from "astro/config";
+import astroVSCodeInspector from "astro-openvscode-inspector";
+import { loadEnv } from "vite";
+
+const { PROJECT_FOLDER } = loadEnv(process.env.NODE_ENV, process.cwd(), "");
+
 export default defineConfig({
   integrations: [
-    astroVSCodeInspector()
-  ]
-})
+    react(
+      isDev
+        ? { babel: { plugins: ["@react-dev-inspector/babel-plugin"] } }
+        : {},
+    ),
+    isDev && astroVSCodeInspector({ projectFolder: PROJECT_FOLDER }),
+  ],
+});
 ```
-Environment Variables
-Make sure to set the project folder path in your .env:
-`PUBLIC_PROJECT_FOLDER=/full/path/to/your/project/`
 
-How it works
-Click the VSCode icon in the Astro DevToolbar
-Hover over components to see detailed tooltips with file information
+## Environment Variables
+Make sure to set the project folder path in your .env:
+`
+PUBLIC_PROJECT_FOLDER=/full/path/to/your/project/`
+`
+
+
+## How it works
+Click the VSCode icon in the Astro DevToolbar <br>
+Hover over components 
 Click on any component to open the corresponding file in VSCode at the exact line
-Inspector mode automatically deactivates after opening a file
-Requirements
-Astro 4.0+ or 5.0+
-VSCode installed and configured with protocol handler
-Development environment only
-React Dev Inspector babel plugin (for data attributes)
+
