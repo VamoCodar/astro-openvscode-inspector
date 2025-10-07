@@ -1,5 +1,6 @@
 # Astro VSCode Inspector
 
+![alt text](https://i.imgur.com/3OJkEWg.png)
 A seamless integration between Astro's DevToolbar and VSCode that allows you to open files directly from your browser during development.
 
 ## Features
@@ -23,8 +24,6 @@ npm install astro-openvscode-inspector
 ## Dependencies
 
 This package requires: 
-
-@floating-ui/dom<br>
 vite<br>
 @react-dev-inspector/babel-plugin<br>
 

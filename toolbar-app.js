@@ -79,7 +79,7 @@ export default defineToolbarApp({
            ${relativePath.replace(/\\\\/g, "/")}#L${line}
           </div>
           <div style="color: #fbbf24; font-size: 11px; font-style: italic;">
-             Clique para abrir no VS Code
+             Clique to open on VS Code
           </div>
         `;
 
