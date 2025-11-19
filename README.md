@@ -10,6 +10,7 @@ A seamless integration between Astro's DevToolbar and VSCode that allows you to 
 - 🎨 **Visual highlighting** - Clear visual feedback when hovering over components
 - ⚡ **Automatic detection** - Finds inspector elements up to 20 levels deep
 - 🔄 **Auto-close** - Inspector mode automatically closes after opening a file
+- 🌍 **Cross-platform** - Works on Windows, macOS, and Linux
 
 ## Installation
 
@@ -51,13 +52,53 @@ export default defineConfig({
 
 ## Environment Variables
 Make sure to set the project folder path in your .env:
-`
-PUBLIC_PROJECT_FOLDER=/full/path/to/your/project/`
-`
 
+**Windows:**
+```env
+PUBLIC_PROJECT_FOLDER=C:/Users/username/project
+# or
+PUBLIC_PROJECT_FOLDER=C:\\Users\\username\\project
+```
+
+**macOS/Linux:**
+```env
+PUBLIC_PROJECT_FOLDER=/Users/username/project
+```
+
+The library automatically detects your operating system and handles path formatting correctly.
 
 ## How it works
-Click the VSCode icon in the Astro DevToolbar <br>
-Hover over components 
-Click on any component to open the corresponding file in VSCode at the exact line
+
+1. Click the VSCode icon in the Astro DevToolbar
+2. Hover over components to see detailed tooltips with file information
+3. Click on any component to open the corresponding file in VSCode at the exact line
+4. Inspector mode automatically deactivates after opening a file
+
+## Platform Support
+
+✅ **Windows** - Fully supported with automatic path normalization  
+✅ **macOS** - Fully supported with automatic OS detection  
+✅ **Linux** - Fully supported
+
+The library automatically detects your operating system and formats paths correctly for the `vscode://` protocol handler.
+
+## Troubleshooting
+
+### VS Code doesn't open when clicking
+
+1. Make sure VS Code is installed and the `code` command is available
+2. Verify that `PUBLIC_PROJECT_FOLDER` is set correctly in your `.env` file
+3. Check browser console for error messages
+4. Ensure the path format matches your OS (see Environment Variables section)
+
+### Wrong file or path errors
+
+- **Windows**: Use forward slashes (`C:/Users/...`) or escaped backslashes (`C:\\Users\\...`)
+- **macOS/Linux**: Use absolute paths starting with `/` (e.g., `/Users/...` or `/home/...`)
+
+### Inspector not working
+
+- Make sure you have the `@react-dev-inspector/babel-plugin` installed and configured
+- Check that the integration is only enabled in development mode
+- Verify that your components have the inspector data attributes
 

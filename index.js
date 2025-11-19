@@ -43,6 +43,8 @@ const vscodeIcon = `<svg width="800px" height="800px" viewBox="0 -1 256 256" ver
  * @param {string} options.icon - Custom icon SVG
  * @param {string} options.id - Custom integration ID
  * @param {string} options.projectFolder - Full path to project folder (required)
+ *   - Windows: C:/Users/username/project or C:\\Users\\username\\project
+ *   - macOS/Linux: /Users/username/project
  */
 export default function astroVSCodeInspector(options = {}) {
   const {

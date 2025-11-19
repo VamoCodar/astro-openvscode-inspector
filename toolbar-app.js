@@ -8,6 +8,38 @@ export default defineToolbarApp({
     let highlightedElement = null;
     let tooltip = null;
 
+    // Detecta o sistema operacional do usuário
+    function detectOS() {
+      // Tenta usar a API moderna navigator.userAgentData (quando disponível)
+      if (navigator.userAgentData && navigator.userAgentData.platform) {
+        const platform = navigator.userAgentData.platform.toLowerCase();
+        if (platform.includes('mac')) return 'mac';
+        if (platform.includes('win')) return 'windows';
+        if (platform.includes('linux')) return 'linux';
+      }
+      
+      // Fallback para userAgent (funciona em todos os navegadores)
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      
+      if (userAgent.includes('mac os') || userAgent.includes('macos') || userAgent.includes('macintosh')) {
+        return 'mac';
+      } else if (userAgent.includes('win')) {
+        return 'windows';
+      } else if (userAgent.includes('linux') || userAgent.includes('x11')) {
+        return 'linux';
+      }
+      
+      // Último fallback: tenta platform (deprecated mas ainda funcional)
+      if (navigator.platform) {
+        const platform = navigator.platform.toLowerCase();
+        if (platform.includes('mac')) return 'mac';
+        if (platform.includes('win')) return 'windows';
+        if (platform.includes('linux')) return 'linux';
+      }
+      
+      return 'unknown';
+    }
+
     server.on("set-project-folder", ({ projectFolder: folder }) => {
       projectFolder = folder
     });
@@ -189,12 +221,37 @@ export default defineToolbarApp({
       // console.log("📂 Opening file:", { line, column, relativePath });
 
       if (line && relativePath) {
-        const normalizedPath = relativePath.replace(/\\\\/g, "/");
-        const projectRoot = projectFolder;
-        const absolutePath = projectRoot + normalizedPath;
+        if (!projectFolder) {
+          console.warn(
+            "⚠️ astro-vscode-inspector: projectFolder not configured. Please set PUBLIC_PROJECT_FOLDER or pass projectFolder option."
+          );
+          return;
+        }
+
+        const os = detectOS();
+        const normalizedRelativePath = relativePath.replace(/\\\\/g, "/");
+        
+        let absolutePath;
+        
+        if (os === 'mac' || os === 'linux') {
+          // macOS e Linux: paths começam com /
+          // Exemplo: /Users/username/project/src/component.tsx
+          const normalizedProjectFolder = projectFolder.replace(/\\/g, "/");
+          const cleanProjectFolder = normalizedProjectFolder.replace(/\/$/, "");
+          const cleanRelativePath = normalizedRelativePath.replace(/^\//, "");
+          absolutePath = `${cleanProjectFolder}/${cleanRelativePath}`;
+        } else {
+          // Windows: paths incluem letra do drive
+          // Exemplo: C:/Users/username/project/src/component.tsx
+          const normalizedProjectFolder = projectFolder.replace(/\\/g, "/");
+          const cleanProjectFolder = normalizedProjectFolder.replace(/\/$/, "");
+          const cleanRelativePath = normalizedRelativePath.replace(/^\//, "");
+          absolutePath = `${cleanProjectFolder}/${cleanRelativePath}`;
+        }
+        
         const vscodeUrl = `vscode://file/${absolutePath}:${line}:${column}`;
 
-        // console.log("🚀 Opening VS Code URL:", vscodeUrl);
+        console.log("🚀 Opening VS Code:", { os, absolutePath, vscodeUrl });
 
         window.location.href = vscodeUrl;
 
