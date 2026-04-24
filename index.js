@@ -1,4 +1,3 @@
-// index.js
 const vscodeIcon = `<svg width="800px" height="800px" viewBox="0 -1 256 256" version="1.1"
     xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
     preserveAspectRatio="xMidYMid">
@@ -37,18 +36,18 @@ const vscodeIcon = `<svg width="800px" height="800px" viewBox="0 -1 256 256" ver
 </svg>`;
 
 /**
- * Astro integration for VSCode inspector
+ * Astro integration for the DevToolbar inspector.
  * @param {Object} options - Configuration options
- * @param {string} options.name - Display name for the toolbar
- * @param {string} options.icon - Custom icon SVG
- * @param {string} options.id - Custom integration ID
- * @param {string} options.projectFolder - Full path to project folder (required)
- *   - Windows: C:/Users/username/project or C:\\Users\\username\\project
- *   - macOS/Linux: /Users/username/project
+ * @param {string} [options.name] - Display name for the toolbar
+ * @param {string} [options.icon] - Custom icon SVG
+ * @param {string} [options.id] - Custom integration ID
+ * @param {string} [options.projectFolder] - Full path to project folder
+ * @param {"vscode"|"zed"} [options.editor] - Target editor protocol
  */
 export default function astroVSCodeInspector(options = {}) {
+  const editor = options.editor ?? "vscode";
   const {
-    name = "VSCode Inspector",
+    name = editor === "zed" ? "Zed Inspector" : "VSCode Inspector",
     icon = vscodeIcon,
     id = "astro:vscode:inspector",
     projectFolder = process.env.PUBLIC_PROJECT_FOLDER,
@@ -56,14 +55,20 @@ export default function astroVSCodeInspector(options = {}) {
 
   if (!projectFolder) {
     console.warn(
-      "⚠️ astroVSCodeInspector: projectFolder is required. Pass it as a prop or set PUBLIC_PROJECT_FOLDER environment variable.",
+      "astroVSCodeInspector: projectFolder is required. Pass it as a prop or set PUBLIC_PROJECT_FOLDER environment variable.",
+    );
+  }
+
+  if (!["vscode", "zed"].includes(editor)) {
+    console.warn(
+      `astroVSCodeInspector: unsupported editor "${editor}". Falling back to "vscode".`,
     );
   }
 
   return {
     name: "astro-vscode-inspector",
     hooks: {
-      "astro:config:setup": ({ addDevToolbarApp, injectScript }) => {
+      "astro:config:setup": ({ addDevToolbarApp }) => {
         addDevToolbarApp({
           id,
           name,
@@ -73,7 +78,10 @@ export default function astroVSCodeInspector(options = {}) {
       },
       "astro:server:setup": ({ toolbar }) => {
         toolbar.onAppInitialized("astro:vscode:inspector", () => {
-          toolbar.send("set-project-folder", { projectFolder });
+          toolbar.send("set-config", {
+            projectFolder,
+            editor: ["vscode", "zed"].includes(editor) ? editor : "vscode",
+          });
         });
       },
     },

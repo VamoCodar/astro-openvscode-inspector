@@ -1,104 +1,123 @@
 # Astro VSCode Inspector
 
 ![alt text](https://i.imgur.com/3OJkEWg.png)
-A seamless integration between Astro's DevToolbar and VSCode that allows you to open files directly from your browser during development.
+A seamless integration between Astro's DevToolbar and your editor that allows you to open files directly from your browser during development.
 
 ## Features
 
-- 🎯 **Click to open** - Click on any component to open it in VSCode
-- 🖱️ **Smart tooltip** - Hover to see component information with beautiful floating tooltips
-- 🎨 **Visual highlighting** - Clear visual feedback when hovering over components
-- ⚡ **Automatic detection** - Finds inspector elements up to 20 levels deep
-- 🔄 **Auto-close** - Inspector mode automatically closes after opening a file
-- 🌍 **Cross-platform** - Works on Windows, macOS, and Linux
+- Click to open components directly in VS Code or Zed
+- Smart tooltip with file information
+- Visual highlighting while inspecting
+- Automatic detection up to 20 levels deep
+- Inspector mode auto-closes after opening a file
+- Cross-platform support for Windows, macOS, and Linux
 
 ## Installation
 
 ```bash
-# requirements
-npm install @react-dev-inspector/babel-plugin vite 
-```
-```bash
+npm install @react-dev-inspector/babel-plugin vite
 npm install astro-openvscode-inspector
 ```
 
 ## Dependencies
 
-This package requires: 
-vite<br>
-@react-dev-inspector/babel-plugin<br>
+This package requires:
+
+- `vite`
+- `@react-dev-inspector/babel-plugin`
 
 ## Usage
-Add the integration to your astro.config.mjs:
+
+Add the integration to your `astro.config.mjs`:
 
 ```js
 import { defineConfig } from "astro/config";
+import react from "@astrojs/react";
 import astroVSCodeInspector from "astro-openvscode-inspector";
 import { loadEnv } from "vite";
 
-const { PROJECT_FOLDER } = loadEnv(process.env.NODE_ENV, process.cwd(), "");
+const { PUBLIC_PROJECT_FOLDER } = loadEnv(process.env.NODE_ENV, process.cwd(), "");
+const isDev = process.env.NODE_ENV === "development";
 
 export default defineConfig({
   integrations: [
-    react(
-      isDev
-        ? { babel: { plugins: ["@react-dev-inspector/babel-plugin"] } }
-        : {},
-    ),
-    isDev && astroVSCodeInspector({ projectFolder: PROJECT_FOLDER }),
+    react(isDev ? { babel: { plugins: ["@react-dev-inspector/babel-plugin"] } } : {}),
+    isDev &&
+      astroVSCodeInspector({
+        projectFolder: PUBLIC_PROJECT_FOLDER,
+      }),
   ],
 });
 ```
 
-## Environment Variables
-Make sure to set the project folder path in your .env:
+## Open in Zed
 
-**Windows:**
+To use Zed instead of VS Code, pass the `editor` option:
+
+```js
+astroVSCodeInspector({
+  projectFolder: PUBLIC_PROJECT_FOLDER,
+  editor: "zed",
+});
+```
+
+The package currently supports:
+
+- `editor: "vscode"` (default)
+- `editor: "zed"`
+
+## Environment Variables
+
+Set the project folder path in your `.env` file.
+
+**Windows**
+
 ```env
 PUBLIC_PROJECT_FOLDER=C:/Users/username/project
 # or
-PUBLIC_PROJECT_FOLDER=C:\\Users\\username\\project
+PUBLIC_PROJECT_FOLDER=C:\Users\username\project
 ```
 
-**macOS/Linux:**
+**macOS/Linux**
+
 ```env
 PUBLIC_PROJECT_FOLDER=/Users/username/project
 ```
 
-The library automatically detects your operating system and handles path formatting correctly.
-
 ## How it works
 
-1. Click the VSCode icon in the Astro DevToolbar
-2. Hover over components to see detailed tooltips with file information
-3. Click on any component to open the corresponding file in VSCode at the exact line
-4. Inspector mode automatically deactivates after opening a file
+1. Click the inspector icon in the Astro DevToolbar.
+2. Hover over components to preview the file and line.
+3. Click any component to open it in your configured editor.
+4. Inspector mode turns itself off after the click.
 
 ## Platform Support
 
-✅ **Windows** - Fully supported with automatic path normalization  
-✅ **macOS** - Fully supported with automatic OS detection  
-✅ **Linux** - Fully supported
+- Windows
+- macOS
+- Linux
 
-The library automatically detects your operating system and formats paths correctly for the `vscode://` protocol handler.
+The package normalizes the project path and uses the matching editor protocol:
+
+- VS Code: `vscode://file/...`
+- Zed: `zed://file...`
 
 ## Troubleshooting
 
-### VS Code doesn't open when clicking
+### The editor does not open
 
-1. Make sure VS Code is installed and the `code` command is available
-2. Verify that `PUBLIC_PROJECT_FOLDER` is set correctly in your `.env` file
-3. Check browser console for error messages
-4. Ensure the path format matches your OS (see Environment Variables section)
+1. Make sure the editor is installed.
+2. Verify that `PUBLIC_PROJECT_FOLDER` points to the real project root.
+3. Check the browser console for warnings.
+4. If you use Zed, confirm that the `zed://` protocol is registered on your system.
 
-### Wrong file or path errors
+### Wrong file or wrong path
 
-- **Windows**: Use forward slashes (`C:/Users/...`) or escaped backslashes (`C:\\Users\\...`)
-- **macOS/Linux**: Use absolute paths starting with `/` (e.g., `/Users/...` or `/home/...`)
+- Windows: use `C:/Users/...` or escaped backslashes
+- macOS/Linux: use absolute paths starting with `/`
 
-### Inspector not working
+### Inspector does not find components
 
-- Make sure you have the `@react-dev-inspector/babel-plugin` installed and configured
-- Check that the integration is only enabled in development mode
-- Verify that your components have the inspector data attributes
-
+- Install `@react-dev-inspector/babel-plugin`
+- Enable the integration only in development mode
+- Confirm your components are emitting the inspector attributes
