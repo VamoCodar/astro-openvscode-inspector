@@ -1,27 +1,9 @@
 import { defineToolbarApp } from "astro/toolbar";
 import { computePosition, flip, shift, offset, arrow } from "@floating-ui/dom";
 
-const EDITOR_CONFIGS = {
-  vscode: {
-    label: "VS Code",
-    buildUrl(absolutePath, line, column) {
-      return `vscode://file/${encodeURI(absolutePath)}:${line}:${column}`;
-    },
-  },
-  zed: {
-    label: "Zed",
-    buildUrl(absolutePath, line, column) {
-      const normalizedPath = normalizePathFragment(absolutePath);
-      const windowsDriveMatch = normalizedPath.match(/^([A-Za-z]):(\/.*)$/);
-
-      if (windowsDriveMatch) {
-        const [, driveLetter, restOfPath] = windowsDriveMatch;
-        return `zed://file${driveLetter}%3A${encodeURI(restOfPath)}:${line}:${column}`;
-      }
-
-      return `zed://file${encodeURI(normalizedPath)}:${line}:${column}`;
-    },
-  },
+const EDITOR_LABELS = {
+  vscode: "VS Code",
+  zed: "Zed",
 };
 
 function normalizeEditor(editor) {
@@ -36,30 +18,19 @@ export default defineToolbarApp({
   init(canvas, app, server) {
     let projectFolder = "";
     let editor = "vscode";
+    let endpoint = "/__open-in-editor";
     let isInspectorMode = false;
     let highlightedElement = null;
     let tooltip = null;
 
-    function detectOS() {
-      const uaDataPlatform = navigator.userAgentData?.platform?.toLowerCase();
-      if (uaDataPlatform?.includes("mac")) return "mac";
-      if (uaDataPlatform?.includes("win")) return "windows";
-      if (uaDataPlatform?.includes("linux")) return "linux";
-
-      const platform = `${window.navigator.userAgent} ${navigator.platform || ""}`.toLowerCase();
-      if (platform.includes("mac")) return "mac";
-      if (platform.includes("win")) return "windows";
-      if (platform.includes("linux") || platform.includes("x11")) return "linux";
-      return "unknown";
-    }
-
-    server.on("set-config", ({ projectFolder: folder, editor: nextEditor }) => {
+    server.on("set-config", ({ projectFolder: folder, editor: nextEditor, endpoint: nextEndpoint }) => {
       projectFolder = folder || "";
       editor = normalizeEditor(nextEditor);
+      if (nextEndpoint) endpoint = nextEndpoint;
     });
 
-    function getEditorConfig() {
-      return EDITOR_CONFIGS[normalizeEditor(editor)];
+    function getEditorLabel() {
+      return EDITOR_LABELS[normalizeEditor(editor)] || editor;
     }
 
     function createTooltip() {
@@ -109,7 +80,6 @@ export default defineToolbarApp({
 
       const line = element.getAttribute("data-inspector-line");
       const relativePath = element.getAttribute("data-inspector-relative-path");
-      const editorConfig = getEditorConfig();
 
       if (!relativePath) return;
 
@@ -127,7 +97,7 @@ export default defineToolbarApp({
           ${normalizedRelativePath}#L${line}
         </div>
         <div style="color: #fbbf24; font-size: 11px; font-style: italic;">
-          Click to open in ${editorConfig.label}
+          Click to open in ${getEditorLabel()}
         </div>
       `;
 
@@ -228,33 +198,44 @@ export default defineToolbarApp({
       return null;
     }
 
-    function openInEditor(element) {
+    async function openInEditor(element) {
       const line = element.getAttribute("data-inspector-line");
       const column = element.getAttribute("data-inspector-column") || "1";
       const relativePath = element.getAttribute("data-inspector-relative-path");
 
-      if (line && relativePath) {
-        if (!projectFolder) {
-          console.warn(
-            "astro-vscode-inspector: projectFolder not configured. Please set PUBLIC_PROJECT_FOLDER or pass projectFolder option.",
-          );
-          return;
-        }
+      if (!line || !relativePath) return;
 
-        const os = detectOS();
-        const normalizedRelativePath = normalizePathFragment(relativePath);
-        const normalizedProjectFolder = normalizePathFragment(projectFolder);
-        const cleanProjectFolder = normalizedProjectFolder.replace(/\/+$/, "");
-        const cleanRelativePath = normalizedRelativePath.replace(/^\/+/, "");
-        const absolutePath = `${cleanProjectFolder}/${cleanRelativePath}`;
-        const editorUrl = getEditorConfig().buildUrl(absolutePath, line, column);
-
-        console.log("Opening editor from inspector:", { editor, os, absolutePath, editorUrl });
-        window.location.href = editorUrl;
-
-        cleanupInspector();
-        app.toggleState({ state: false });
+      if (!projectFolder) {
+        console.warn(
+          "astro-vscode-inspector: projectFolder not configured. Please set PUBLIC_PROJECT_FOLDER or pass projectFolder option.",
+        );
+        return;
       }
+
+      const normalizedRelativePath = normalizePathFragment(relativePath);
+      const normalizedProjectFolder = normalizePathFragment(projectFolder);
+      const cleanProjectFolder = normalizedProjectFolder.replace(/\/+$/, "");
+      const cleanRelativePath = normalizedRelativePath.replace(/^\/+/, "");
+      const absolutePath = `${cleanProjectFolder}/${cleanRelativePath}`;
+
+      console.log("[inspector] opening", { editor, absolutePath, line, column });
+
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ file: absolutePath, line, column }),
+        });
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          console.error(`[inspector] server returned ${response.status}: ${text}`);
+        }
+      } catch (err) {
+        console.error("[inspector] failed to reach open-in-editor endpoint", err);
+      }
+
+      cleanupInspector();
+      app.toggleState({ state: false });
     }
 
     function handleDocumentClick(event) {
@@ -306,4 +287,3 @@ export default defineToolbarApp({
     console.log("Dev Inspector initialized successfully");
   },
 });
-

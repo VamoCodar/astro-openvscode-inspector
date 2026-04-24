@@ -1,3 +1,5 @@
+import launchEditor from "launch-editor";
+
 const vscodeIcon = `<svg width="800px" height="800px" viewBox="0 -1 256 256" version="1.1"
     xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
     preserveAspectRatio="xMidYMid">
@@ -35,6 +37,15 @@ const vscodeIcon = `<svg width="800px" height="800px" viewBox="0 -1 256 256" ver
     </g>
 </svg>`;
 
+const SUPPORTED_EDITORS = ["vscode", "zed"];
+const OPEN_ENDPOINT = "/__open-in-editor";
+
+function resolveEditorCommand(editor, override) {
+  if (override) return override;
+  if (editor === "zed") return process.env.ZED_BIN || "zed";
+  return process.env.VSCODE_BIN || "code";
+}
+
 /**
  * Astro integration for the DevToolbar inspector.
  * @param {Object} options - Configuration options
@@ -42,15 +53,17 @@ const vscodeIcon = `<svg width="800px" height="800px" viewBox="0 -1 256 256" ver
  * @param {string} [options.icon] - Custom icon SVG
  * @param {string} [options.id] - Custom integration ID
  * @param {string} [options.projectFolder] - Full path to project folder
- * @param {"vscode"|"zed"} [options.editor] - Target editor protocol
+ * @param {"vscode"|"zed"} [options.editor] - Target editor
+ * @param {string} [options.editorCommand] - CLI binary override (e.g. "zed-preview")
  */
 export default function astroVSCodeInspector(options = {}) {
-  const editor = options.editor ?? "vscode";
+  const editor = SUPPORTED_EDITORS.includes(options.editor) ? options.editor : "vscode";
   const {
     name = editor === "zed" ? "Zed Inspector" : "VSCode Inspector",
     icon = vscodeIcon,
     id = "astro:vscode:inspector",
     projectFolder = process.env.PUBLIC_PROJECT_FOLDER,
+    editorCommand,
   } = options;
 
   if (!projectFolder) {
@@ -59,11 +72,13 @@ export default function astroVSCodeInspector(options = {}) {
     );
   }
 
-  if (!["vscode", "zed"].includes(editor)) {
+  if (options.editor && !SUPPORTED_EDITORS.includes(options.editor)) {
     console.warn(
-      `astroVSCodeInspector: unsupported editor "${editor}". Falling back to "vscode".`,
+      `astroVSCodeInspector: unsupported editor "${options.editor}". Falling back to "vscode".`,
     );
   }
+
+  const resolvedCommand = resolveEditorCommand(editor, editorCommand);
 
   return {
     name: "astro-vscode-inspector",
@@ -76,11 +91,59 @@ export default function astroVSCodeInspector(options = {}) {
           entrypoint: new URL("./toolbar-app.js", import.meta.url).href,
         });
       },
-      "astro:server:setup": ({ toolbar }) => {
-        toolbar.onAppInitialized("astro:vscode:inspector", () => {
+      "astro:server:setup": ({ server, toolbar, logger }) => {
+        toolbar.onAppInitialized(id, () => {
           toolbar.send("set-config", {
             projectFolder,
-            editor: ["vscode", "zed"].includes(editor) ? editor : "vscode",
+            editor,
+            endpoint: OPEN_ENDPOINT,
+          });
+        });
+
+        server.middlewares.use(OPEN_ENDPOINT, (req, res) => {
+          if (req.method !== "POST") {
+            res.statusCode = 405;
+            res.setHeader("Allow", "POST");
+            res.end("Method Not Allowed");
+            return;
+          }
+
+          let body = "";
+          req.on("data", (chunk) => {
+            body += chunk;
+            if (body.length > 1e6) {
+              req.destroy();
+            }
+          });
+          req.on("end", () => {
+            let payload;
+            try {
+              payload = JSON.parse(body || "{}");
+            } catch {
+              res.statusCode = 400;
+              res.end("Invalid JSON");
+              return;
+            }
+
+            const { file, line = 1, column = 1 } = payload;
+            if (!file || typeof file !== "string") {
+              res.statusCode = 400;
+              res.end("Missing file");
+              return;
+            }
+
+            const locator = `${file}:${line}:${column}`;
+            logger?.info?.(`[inspector] opening ${locator} in ${resolvedCommand}`);
+
+            launchEditor(locator, resolvedCommand, (fileName, errMsg) => {
+              logger?.error?.(
+                `[inspector] launch-editor failed for ${fileName}: ${errMsg}`,
+              );
+            });
+
+            res.statusCode = 200;
+            res.setHeader("content-type", "application/json");
+            res.end(JSON.stringify({ ok: true }));
           });
         });
       },
