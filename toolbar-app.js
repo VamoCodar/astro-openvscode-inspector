@@ -11,7 +11,9 @@ const EDITOR_CONFIGS = {
   zed: {
     label: "Zed",
     buildUrl(absolutePath, line, column) {
-      return `zed://file${encodeURI(absolutePath)}:${line}:${column}`;
+      const needsWindowsDriveSeparator = /^[A-Za-z]:\//.test(absolutePath);
+      const separator = needsWindowsDriveSeparator ? "/" : "";
+      return `zed://file${separator}${encodeURI(absolutePath)}:${line}:${column}`;
     },
   },
 };
@@ -293,3 +295,4 @@ export default defineToolbarApp({
     console.log("Dev Inspector initialized successfully");
   },
 });
+
