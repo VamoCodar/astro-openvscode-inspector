@@ -11,15 +11,25 @@ const EDITOR_CONFIGS = {
   zed: {
     label: "Zed",
     buildUrl(absolutePath, line, column) {
-      const needsWindowsDriveSeparator = /^[A-Za-z]:\//.test(absolutePath);
-      const separator = needsWindowsDriveSeparator ? "/" : "";
-      return `zed://file${separator}${encodeURI(absolutePath)}:${line}:${column}`;
+      const normalizedPath = normalizePathFragment(absolutePath);
+      const windowsDriveMatch = normalizedPath.match(/^([A-Za-z]):(\/.*)$/);
+
+      if (windowsDriveMatch) {
+        const [, driveLetter, restOfPath] = windowsDriveMatch;
+        return `zed://file${driveLetter}%3A${encodeURI(restOfPath)}:${line}:${column}`;
+      }
+
+      return `zed://file${encodeURI(normalizedPath)}:${line}:${column}`;
     },
   },
 };
 
 function normalizeEditor(editor) {
   return editor === "zed" ? "zed" : "vscode";
+}
+
+function normalizePathFragment(pathLike) {
+  return pathLike.replace(/[\\/]+/g, "/");
 }
 
 export default defineToolbarApp({
@@ -103,7 +113,8 @@ export default defineToolbarApp({
 
       if (!relativePath) return;
 
-      const pathParts = relativePath.split(/[\/\\]/);
+      const normalizedRelativePath = normalizePathFragment(relativePath);
+      const pathParts = normalizedRelativePath.split("/");
       const fileName = pathParts[pathParts.length - 1];
       const componentName = fileName.replace(/\.(jsx|tsx|js|ts|astro)$/, "");
 
@@ -113,7 +124,7 @@ export default defineToolbarApp({
           <span style="font-weight: 600; color: #10b981; font-size: 16px;">&lt;${componentName} /&gt;</span>
         </div>
         <div style="color: #94a3b8; font-size: 11px; margin-bottom: 6px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; width: 100%;">
-          ${relativePath.replace(/\\/g, "/")}#L${line}
+          ${normalizedRelativePath}#L${line}
         </div>
         <div style="color: #fbbf24; font-size: 11px; font-style: italic;">
           Click to open in ${editorConfig.label}
@@ -231,10 +242,10 @@ export default defineToolbarApp({
         }
 
         const os = detectOS();
-        const normalizedRelativePath = relativePath.replace(/\\\\/g, "/");
-        const normalizedProjectFolder = projectFolder.replace(/\\/g, "/");
-        const cleanProjectFolder = normalizedProjectFolder.replace(/\/$/, "");
-        const cleanRelativePath = normalizedRelativePath.replace(/^\//, "");
+        const normalizedRelativePath = normalizePathFragment(relativePath);
+        const normalizedProjectFolder = normalizePathFragment(projectFolder);
+        const cleanProjectFolder = normalizedProjectFolder.replace(/\/+$/, "");
+        const cleanRelativePath = normalizedRelativePath.replace(/^\/+/, "");
         const absolutePath = `${cleanProjectFolder}/${cleanRelativePath}`;
         const editorUrl = getEditorConfig().buildUrl(absolutePath, line, column);
 

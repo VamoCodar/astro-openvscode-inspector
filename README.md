@@ -101,6 +101,7 @@ The package normalizes the project path and uses the matching editor protocol:
 
 - VS Code: `vscode://file/...`
 - Zed: `zed://file...`
+  On Windows, the drive separator is encoded so the browser preserves `C:/...` correctly.
 
 ## Troubleshooting
 
