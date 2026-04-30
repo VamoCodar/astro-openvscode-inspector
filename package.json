@@ -24,7 +24,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/VamoCodar/astro-openvscode-inspector.git"
+    "url": "git+https://github.com/VamoCodar/astro-openvscode-inspector.git"
   },
   "bugs": {
     "url": "https://github.com/VamoCodar/astro-openvscode-inspector/issues"

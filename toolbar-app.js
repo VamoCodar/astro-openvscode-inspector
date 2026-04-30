@@ -4,10 +4,20 @@ import { computePosition, flip, shift, offset, arrow } from "@floating-ui/dom";
 const EDITOR_LABELS = {
   vscode: "VS Code",
   zed: "Zed",
+  cursor: "Cursor",
+  sublime: "Sublime Text",
+  atom: "Atom",
+  vim: "Vim",
+  emacs: "Emacs",
+  nano: "Nano",
+  kate: "Kate",
+  geany: "Geany",
+  textmate: "TextMate",
+  textedit: "TextEdit",
 };
 
 function normalizeEditor(editor) {
-  return editor === "zed" ? "zed" : "vscode";
+  return EDITOR_LABELS[editor] || editor;
 }
 
 function normalizePathFragment(pathLike) {
