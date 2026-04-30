@@ -1,0 +1,10 @@
+# Copy to .npmrc in project root, OR set NPM_TOKEN and use the tracked .npmrc (see below).
+#
+# registry=https://registry.npmjs.org/
+# always-auth=true
+# //registry.npmjs.org/:_authToken=${NPM_TOKEN}
+#
+# Token (npmjs.com → Access Tokens → Granular):
+# - Packages: astro-openvscode-inspector
+# - Permissions: Read and write
+# - Bypass 2FA: ON (required or publish returns 403)

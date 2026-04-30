@@ -1,299 +1,252 @@
 import { defineToolbarApp } from "astro/toolbar";
 import { computePosition, flip, shift, offset, arrow } from "@floating-ui/dom";
 
-const EDITOR_LABELS = {
-  vscode: "VS Code",
-  zed: "Zed",
-  cursor: "Cursor",
-  sublime: "Sublime Text",
-  atom: "Atom",
-  vim: "Vim",
-  emacs: "Emacs",
-  nano: "Nano",
-  kate: "Kate",
-  geany: "Geany",
-  textmate: "TextMate",
-  textedit: "TextEdit",
-};
+const MAX_ANCESTOR_DEPTH = 20;
+const TOOLTIP_OFFSET = 12;
 
-function normalizeEditor(editor) {
-  return EDITOR_LABELS[editor] || editor;
-}
+const tooltipRootStyle = [
+  "position:absolute",
+  "z-index:9999",
+  "background:linear-gradient(135deg,#1e293b 0%,#334155 100%)",
+  "color:#f8fafc",
+  "padding:12px 16px",
+  "border-radius:8px",
+  "font-family:'SF Mono','Monaco','Cascadia Code','Roboto Mono',monospace",
+  "font-size:12px",
+  "line-height:1.4",
+  "box-shadow:0 10px 25px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.15)",
+  "border:1px solid rgba(148,163,184,.2)",
+  "min-width:320px",
+  "pointer-events:none",
+  "max-width:clamp(320px,40vw,90vw)",
+  "opacity:0",
+  "transform:scale(.95)",
+  "transition:opacity .2s ease,transform .2s ease",
+  "backdrop-filter:blur(8px)",
+].join(";");
+
+const arrowStyle = [
+  "position:absolute",
+  "width:8px",
+  "height:8px",
+  "background:#334155",
+  "transform:rotate(45deg)",
+  "border:1px solid rgba(148,163,184,.2)",
+  "border-top:none",
+  "border-left:none",
+].join(";");
 
 function normalizePathFragment(pathLike) {
   return pathLike.replace(/[\\/]+/g, "/");
 }
 
-export default defineToolbarApp({
-  init(canvas, app, server) {
-    let projectFolder = "";
-    let editor = "vscode";
-    let endpoint = "/__open-in-editor";
-    let isInspectorMode = false;
-    let highlightedElement = null;
-    let tooltip = null;
+function hasInspectorAttrs(el) {
+  return (
+    el.hasAttribute("data-inspector-line") && el.hasAttribute("data-inspector-relative-path")
+  );
+}
 
-    server.on("set-config", ({ projectFolder: folder, editor: nextEditor, endpoint: nextEndpoint }) => {
-      projectFolder = folder || "";
-      editor = normalizeEditor(nextEditor);
-      if (nextEndpoint) endpoint = nextEndpoint;
+function findInspectorElement(start) {
+  let current = start;
+  let depth = 0;
+  while (current && current !== document.body && depth < MAX_ANCESTOR_DEPTH) {
+    if (hasInspectorAttrs(current)) return current;
+    current = current.parentElement;
+    depth += 1;
+  }
+  return null;
+}
+
+export default defineToolbarApp({
+  init(_canvas, app, server) {
+    let projectFolder = "";
+    let editorLabel = "VS Code";
+    let endpoint = "/__open-in-editor";
+    let inspectorOn = false;
+    let highlighted = null;
+    let tooltipEl = null;
+
+    server.on("set-config", (cfg) => {
+      projectFolder = cfg.projectFolder || "";
+      editorLabel =
+        cfg.editorLabel ||
+        (cfg.editorId ? cfg.editorId.replace(/-/g, " ") : null) ||
+        cfg.editor ||
+        editorLabel;
+      if (cfg.endpoint) endpoint = cfg.endpoint;
     });
 
-    function getEditorLabel() {
-      return EDITOR_LABELS[normalizeEditor(editor)] || editor;
+    function ensureTooltip() {
+      if (tooltipEl) return tooltipEl;
+      const root = document.createElement("div");
+      root.id = "dev-inspector-tooltip";
+      root.style.cssText = tooltipRootStyle;
+      const arrow = document.createElement("div");
+      arrow.id = "tooltip-arrow";
+      arrow.style.cssText = arrowStyle;
+      root.appendChild(arrow);
+      document.body.appendChild(root);
+      tooltipEl = root;
+      return root;
     }
 
-    function createTooltip() {
-      const tooltipEl = document.createElement("div");
-      tooltipEl.id = "dev-inspector-tooltip";
-      tooltipEl.style.cssText = `
-        position: absolute;
-        z-index: 9999;
-        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-        color: #f8fafc;
-        padding: 12px 16px;
-        border-radius: 8px;
-        font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
-        font-size: 12px;
-        line-height: 1.4;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15);
-        border: 1px solid rgba(148, 163, 184, 0.2);
-        min-width: 320px;
-        pointer-events: none;
-        max-width: clamp(320px, 40vw, 90vw);
-        opacity: 0;
-        transform: scale(0.95);
-        transition: opacity 0.2s ease, transform 0.2s ease;
-        backdrop-filter: blur(8px);
-      `;
-
-      const arrowEl = document.createElement("div");
-      arrowEl.id = "tooltip-arrow";
-      arrowEl.style.cssText = `
-        position: absolute;
-        width: 8px;
-        height: 8px;
-        background: #334155;
-        transform: rotate(45deg);
-        border: 1px solid rgba(148, 163, 184, 0.2);
-        border-top: none;
-        border-left: none;
-      `;
-
-      tooltipEl.appendChild(arrowEl);
-      document.body.appendChild(tooltipEl);
-      return tooltipEl;
+    function setArrowStyles(arrow) {
+      if (!arrow) return;
+      arrow.style.cssText = arrowStyle;
     }
 
-    function updateTooltipContent(element) {
-      if (!tooltip) return;
-
+    function renderTooltipContent(element) {
+      const tip = ensureTooltip();
       const line = element.getAttribute("data-inspector-line");
       const relativePath = element.getAttribute("data-inspector-relative-path");
-
       if (!relativePath) return;
 
-      const normalizedRelativePath = normalizePathFragment(relativePath);
-      const pathParts = normalizedRelativePath.split("/");
-      const fileName = pathParts[pathParts.length - 1];
+      const pathNorm = normalizePathFragment(relativePath);
+      const fileName = pathNorm.split("/").pop() || "";
       const componentName = fileName.replace(/\.(jsx|tsx|js|ts|astro)$/, "");
 
-      tooltip.innerHTML = `
+      tip.innerHTML = `
         <div id="tooltip-arrow"></div>
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-          <span style="font-weight: 600; color: #10b981; font-size: 16px;">&lt;${componentName} /&gt;</span>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="font-weight:600;color:#10b981;font-size:16px;">&lt;${componentName} /&gt;</span>
         </div>
-        <div style="color: #94a3b8; font-size: 11px; margin-bottom: 6px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; width: 100%;">
-          ${normalizedRelativePath}#L${line}
+        <div style="color:#94a3b8;font-size:11px;margin-bottom:6px;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;width:100%;">
+          ${pathNorm}#L${line}
         </div>
-        <div style="color: #fbbf24; font-size: 11px; font-style: italic;">
-          Click to open in ${getEditorLabel()}
-        </div>
-      `;
-
-      const arrowEl = tooltip.querySelector("#tooltip-arrow");
-      if (arrowEl) {
-        arrowEl.style.cssText = `
-          position: absolute;
-          width: 8px;
-          height: 8px;
-          background: #334155;
-          transform: rotate(45deg);
-          border: 1px solid rgba(148, 163, 184, 0.2);
-          border-top: none;
-          border-left: none;
-        `;
-      }
+        <div style="color:#fbbf24;font-size:11px;font-style:italic;">
+          Click to open in ${editorLabel}
+        </div>`;
+      setArrowStyles(tip.querySelector("#tooltip-arrow"));
     }
 
     async function showTooltip(element) {
-      if (!tooltip) {
-        tooltip = createTooltip();
-      }
-
-      updateTooltipContent(element);
-      const arrowEl = tooltip.querySelector("#tooltip-arrow");
-
-      const { x, y, placement, middlewareData } = await computePosition(element, tooltip, {
+      const tip = ensureTooltip();
+      renderTooltipContent(element);
+      const arrow = tip.querySelector("#tooltip-arrow");
+      const { x, y, placement, middlewareData } = await computePosition(element, tip, {
         placement: "top",
-        middleware: [offset(12), flip(), shift({ padding: 8 }), arrow({ element: arrowEl })],
+        middleware: [offset(TOOLTIP_OFFSET), flip(), shift({ padding: 8 }), arrow({ element: arrow })],
       });
 
-      tooltip.style.left = `${x}px`;
-      tooltip.style.top = `${y}px`;
+      tip.style.left = `${x}px`;
+      tip.style.top = `${y}px`;
 
-      if (middlewareData.arrow && arrowEl) {
-        const { x: arrowX, y: arrowY } = middlewareData.arrow;
-        const staticSide = {
-          top: "bottom",
-          right: "left",
-          bottom: "top",
-          left: "right",
-        }[placement.split("-")[0]];
-
-        arrowEl.style.left = arrowX != null ? `${arrowX}px` : "";
-        arrowEl.style.top = arrowY != null ? `${arrowY}px` : "";
-        arrowEl.style.right = "";
-        arrowEl.style.bottom = "";
-        arrowEl.style[staticSide] = "-4px";
+      if (middlewareData.arrow && arrow) {
+        const { x: ax, y: ay } = middlewareData.arrow;
+        const staticSide = { top: "bottom", right: "left", bottom: "top", left: "right" }[
+          placement.split("-")[0]
+        ];
+        arrow.style.left = ax != null ? `${ax}px` : "";
+        arrow.style.top = ay != null ? `${ay}px` : "";
+        arrow.style.right = "";
+        arrow.style.bottom = "";
+        arrow.style[staticSide] = "-4px";
       }
 
-      tooltip.style.opacity = "1";
-      tooltip.style.transform = "scale(1)";
+      tip.style.opacity = "1";
+      tip.style.transform = "scale(1)";
     }
 
     function hideTooltip() {
-      if (!tooltip) return;
-      tooltip.style.opacity = "0";
-      tooltip.style.transform = "scale(0.95)";
+      if (!tooltipEl) return;
+      tooltipEl.style.opacity = "0";
+      tooltipEl.style.transform = "scale(.95)";
     }
 
     function clearHighlight() {
-      if (!highlightedElement) return;
-      highlightedElement.style.outline = "";
-      highlightedElement.style.backgroundColor = "";
-      highlightedElement.style.cursor = "";
-      highlightedElement = null;
+      if (!highlighted) return;
+      highlighted.style.outline = "";
+      highlighted.style.backgroundColor = "";
+      highlighted.style.cursor = "";
+      highlighted = null;
     }
 
-    function cleanupInspector() {
-      isInspectorMode = false;
-      document.removeEventListener("click", handleDocumentClick, true);
-      document.removeEventListener("mouseover", handleMouseOver, true);
-      document.removeEventListener("mouseout", handleMouseOut, true);
+    function teardownInspector() {
+      inspectorOn = false;
+      document.removeEventListener("click", onDocClick, true);
+      document.removeEventListener("mouseover", onMouseOver, true);
+      document.removeEventListener("mouseout", onMouseOut, true);
       clearHighlight();
       hideTooltip();
-      if (tooltip) {
-        tooltip.remove();
-        tooltip = null;
+      if (tooltipEl) {
+        tooltipEl.remove();
+        tooltipEl = null;
       }
-    }
-
-    function findInspectorElement(element) {
-      let current = element;
-      let depth = 0;
-      const maxDepth = 20;
-
-      while (current && current !== document.body && depth < maxDepth) {
-        if (
-          current.hasAttribute("data-inspector-line") &&
-          current.hasAttribute("data-inspector-relative-path")
-        ) {
-          return current;
-        }
-        current = current.parentElement;
-        depth += 1;
-      }
-
-      return null;
     }
 
     async function openInEditor(element) {
       const line = element.getAttribute("data-inspector-line");
       const column = element.getAttribute("data-inspector-column") || "1";
       const relativePath = element.getAttribute("data-inspector-relative-path");
-
       if (!line || !relativePath) return;
 
       if (!projectFolder) {
         console.warn(
-          "astro-vscode-inspector: projectFolder not configured. Please set PUBLIC_PROJECT_FOLDER or pass projectFolder option.",
+          "astro-vscode-inspector: projectFolder not configured. PUBLIC_PROJECT_FOLDER or projectFolder option.",
         );
         return;
       }
 
-      const normalizedRelativePath = normalizePathFragment(relativePath);
-      const normalizedProjectFolder = normalizePathFragment(projectFolder);
-      const cleanProjectFolder = normalizedProjectFolder.replace(/\/+$/, "");
-      const cleanRelativePath = normalizedRelativePath.replace(/^\/+/, "");
-      const absolutePath = `${cleanProjectFolder}/${cleanRelativePath}`;
-
-      console.log("[inspector] opening", { editor, absolutePath, line, column });
+      const rel = normalizePathFragment(relativePath).replace(/^\/+/, "");
+      const root = normalizePathFragment(projectFolder).replace(/\/+$/, "");
+      const absolutePath = `${root}/${rel}`;
 
       try {
-        const response = await fetch(endpoint, {
+        const res = await fetch(endpoint, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ file: absolutePath, line, column }),
         });
-        if (!response.ok) {
-          const text = await response.text().catch(() => "");
-          console.error(`[inspector] server returned ${response.status}: ${text}`);
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          console.error(`[inspector] server ${res.status}: ${text}`);
         }
       } catch (err) {
-        console.error("[inspector] failed to reach open-in-editor endpoint", err);
+        console.error("[inspector] open-in-editor request failed", err);
       }
 
-      cleanupInspector();
+      teardownInspector();
       app.toggleState({ state: false });
     }
 
-    function handleDocumentClick(event) {
-      if (!isInspectorMode) return;
-
-      const inspectorElement = findInspectorElement(event.target);
-
-      if (!inspectorElement) return;
-      event.preventDefault();
-      event.stopPropagation();
-      openInEditor(inspectorElement);
+    function onDocClick(ev) {
+      if (!inspectorOn) return;
+      const target = findInspectorElement(ev.target);
+      if (!target) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      openInEditor(target);
     }
 
-    function handleMouseOver(event) {
-      if (!isInspectorMode) return;
-
-      const inspectorElement = findInspectorElement(event.target);
-
-      if (inspectorElement && inspectorElement !== highlightedElement) {
-        clearHighlight();
-        highlightedElement = inspectorElement;
-        highlightedElement.style.outline = "2px solid #10b981";
-        highlightedElement.style.backgroundColor = "rgba(16, 185, 129, 0.1)";
-        highlightedElement.style.cursor = "pointer";
-        showTooltip(inspectorElement);
-      }
+    function onMouseOver(ev) {
+      if (!inspectorOn) return;
+      const target = findInspectorElement(ev.target);
+      if (!target || target === highlighted) return;
+      clearHighlight();
+      highlighted = target;
+      highlighted.style.outline = "2px solid #10b981";
+      highlighted.style.backgroundColor = "rgba(16,185,129,.1)";
+      highlighted.style.cursor = "pointer";
+      showTooltip(target);
     }
 
-    function handleMouseOut() {
-      if (!isInspectorMode || !highlightedElement) return;
-
+    function onMouseOut() {
+      if (!inspectorOn || !highlighted) return;
       clearHighlight();
       hideTooltip();
     }
 
     app.onToggled(({ state }) => {
-      isInspectorMode = state;
-
-      if (isInspectorMode) {
-        document.addEventListener("click", handleDocumentClick, true);
-        document.addEventListener("mouseover", handleMouseOver, true);
-        document.addEventListener("mouseout", handleMouseOut, true);
+      inspectorOn = state;
+      if (inspectorOn) {
+        document.addEventListener("click", onDocClick, true);
+        document.addEventListener("mouseover", onMouseOver, true);
+        document.addEventListener("mouseout", onMouseOut, true);
         return;
       }
-
-      cleanupInspector();
+      teardownInspector();
     });
 
-    console.log("Dev Inspector initialized successfully");
+    console.log("Dev Inspector initialized");
   },
 });

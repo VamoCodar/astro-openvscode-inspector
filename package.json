@@ -1,18 +1,26 @@
 {
   "name": "astro-openvscode-inspector",
-  "version": "1.7.0",
-  "description": "Astro DevToolbar inspector that opens files directly in VS Code or Zed",
+  "version": "1.12.0",
+  "description": "Astro DevToolbar inspector — open components in VS Code, Cursor, JetBrains, Zed, Vim, and other editors supported by launch-editor.",
   "main": "index.js",
   "type": "module",
   "exports": {
-    ".": "./index.js"
+    ".": "./index.js",
+    "./editor-registry": "./lib/editor-registry.js",
+    "./editor-toolbar-icons": "./lib/editor-toolbar-icons.js"
   },
   "keywords": [
     "astro",
     "vscode",
+    "cursor",
     "zed",
+    "jetbrains",
+    "sublime",
+    "vim",
+    "emacs",
     "inspector",
     "devtools",
+    "launch-editor",
     "development",
     "integration",
     "cross-platform",
@@ -35,17 +43,21 @@
   },
   "dependencies": {
     "@floating-ui/dom": "^1.7.4",
-    "launch-editor": "^2.9.1"
+    "launch-editor": "^2.9.1",
+    "simple-icons": "^16.18.0"
   },
   "files": [
     "index.js",
     "toolbar-app.js",
+    "lib/**/*.js",
     "README.md",
     "LICENSE",
     ".env.example"
   ],
   "engines": {
     "node": ">=18.0.0"
+  },
+  "scripts": {
+    "prepublishOnly": "node scripts/check-npm-token.mjs"
   }
 }
-
