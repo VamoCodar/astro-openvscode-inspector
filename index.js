@@ -71,6 +71,15 @@ function stripTrailingSlash(p) {
   return p.replace(/[\\/]+$/, "");
 }
 
+// Astro's integration logger is a class — extracting `logger.error` loses `this`.
+// Bind the methods (or fall back to console) so we can call them as plain functions.
+function bindLog(logger) {
+  return {
+    info: logger?.info ? logger.info.bind(logger) : console.log,
+    error: logger?.error ? logger.error.bind(logger) : console.error,
+  };
+}
+
 /**
  * Astro DevToolbar integration: open inspected components in any editor supported by `launch-editor`.
  *
@@ -111,6 +120,7 @@ export default function astroVSCodeInspector(options = {}) {
     name: INTEGRATION_PACKAGE_NAME,
     hooks: {
       "astro:config:setup": ({ addDevToolbarApp, config, logger }) => {
+        const log = bindLog(logger);
         try {
           // Priority: explicit option > env var > Astro's config.root (auto, cross-platform)
           projectFolder = resolveProjectFolder({
@@ -120,34 +130,35 @@ export default function astroVSCodeInspector(options = {}) {
           });
 
           if (!projectFolder) {
-            (logger?.error ?? console.error)(
+            log.error(
               `${LOG_PREFIX} could not resolve projectFolder — no option, no env var, and config.root unavailable. Inspector will not open files.`,
             );
           } else {
-            (logger?.info ?? console.log)(
-              `${LOG_PREFIX} projectFolder resolved: ${projectFolder}`,
-            );
+            log.info(`${LOG_PREFIX} projectFolder resolved: ${projectFolder}`);
           }
 
           if (!isValidSvgIcon(icon)) {
-            const msg = `invalid icon — expected SVG string, got ${typeof icon}. Refusing to register to avoid breaking the toolbar.`;
-            (logger?.error ?? console.error)(`${LOG_PREFIX} ${msg}`);
+            log.error(
+              `${LOG_PREFIX} invalid icon — expected SVG string, got ${typeof icon}. Refusing to register to avoid breaking the toolbar.`,
+            );
             return;
           }
           if (!isResolvableEntrypoint(entrypoint)) {
-            const msg = `entrypoint not resolvable on disk: ${entrypoint}. Refusing to register.`;
-            (logger?.error ?? console.error)(`${LOG_PREFIX} ${msg}`);
+            log.error(
+              `${LOG_PREFIX} entrypoint not resolvable on disk: ${entrypoint}. Refusing to register.`,
+            );
             return;
           }
           addDevToolbarApp({ id, name, icon, entrypoint });
-          (logger?.info ?? console.log)(`${LOG_PREFIX} toolbar app registered: ${id}`);
+          log.info(`${LOG_PREFIX} toolbar app registered: ${id}`);
         } catch (err) {
-          (logger?.error ?? console.error)(
+          log.error(
             `${LOG_PREFIX} addDevToolbarApp failed — isolated to avoid breaking other toolbar apps: ${err?.message ?? err}`,
           );
         }
       },
       "astro:server:setup": ({ server, toolbar, logger }) => {
+        const log = bindLog(logger);
         try {
           toolbar.onAppInitialized(id, () => {
             try {
@@ -158,13 +169,13 @@ export default function astroVSCodeInspector(options = {}) {
                 endpoint: OPEN_ENDPOINT,
               });
             } catch (err) {
-              (logger?.error ?? console.error)(
+              log.error(
                 `${LOG_PREFIX} toolbar.send(set-config) failed: ${err?.message ?? err}`,
               );
             }
           });
         } catch (err) {
-          (logger?.error ?? console.error)(
+          log.error(
             `${LOG_PREFIX} toolbar.onAppInitialized registration failed: ${err?.message ?? err}`,
           );
         }
@@ -178,7 +189,7 @@ export default function astroVSCodeInspector(options = {}) {
             }),
           );
         } catch (err) {
-          (logger?.error ?? console.error)(
+          log.error(
             `${LOG_PREFIX} middleware registration on ${OPEN_ENDPOINT} failed: ${err?.message ?? err}`,
           );
         }
