@@ -81,18 +81,18 @@ export default defineToolbarApp({
       const root = document.createElement("div");
       root.id = "dev-inspector-tooltip";
       root.style.cssText = tooltipRootStyle;
-      const arrow = document.createElement("div");
-      arrow.id = "tooltip-arrow";
-      arrow.style.cssText = arrowStyle;
-      root.appendChild(arrow);
+      const arrowEl = document.createElement("div");
+      arrowEl.id = "tooltip-arrow";
+      arrowEl.style.cssText = arrowStyle;
+      root.appendChild(arrowEl);
       document.body.appendChild(root);
       tooltipEl = root;
       return root;
     }
 
-    function setArrowStyles(arrow) {
-      if (!arrow) return;
-      arrow.style.cssText = arrowStyle;
+    function setArrowStyles(arrowEl) {
+      if (!arrowEl) return;
+      arrowEl.style.cssText = arrowStyle;
     }
 
     function renderTooltipContent(element) {
@@ -122,25 +122,25 @@ export default defineToolbarApp({
     async function showTooltip(element) {
       const tip = ensureTooltip();
       renderTooltipContent(element);
-      const arrow = tip.querySelector("#tooltip-arrow");
+      const arrowEl = tip.querySelector("#tooltip-arrow");
       const { x, y, placement, middlewareData } = await computePosition(element, tip, {
         placement: "top",
-        middleware: [offset(TOOLTIP_OFFSET), flip(), shift({ padding: 8 }), arrow({ element: arrow })],
+        middleware: [offset(TOOLTIP_OFFSET), flip(), shift({ padding: 8 }), arrow({ element: arrowEl })],
       });
 
       tip.style.left = `${x}px`;
       tip.style.top = `${y}px`;
 
-      if (middlewareData.arrow && arrow) {
+      if (middlewareData.arrow && arrowEl) {
         const { x: ax, y: ay } = middlewareData.arrow;
         const staticSide = { top: "bottom", right: "left", bottom: "top", left: "right" }[
           placement.split("-")[0]
         ];
-        arrow.style.left = ax != null ? `${ax}px` : "";
-        arrow.style.top = ay != null ? `${ay}px` : "";
-        arrow.style.right = "";
-        arrow.style.bottom = "";
-        arrow.style[staticSide] = "-4px";
+        arrowEl.style.left = ax != null ? `${ax}px` : "";
+        arrowEl.style.top = ay != null ? `${ay}px` : "";
+        arrowEl.style.right = "";
+        arrowEl.style.bottom = "";
+        arrowEl.style[staticSide] = "-4px";
       }
 
       tip.style.opacity = "1";
