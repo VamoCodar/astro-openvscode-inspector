@@ -1,8 +1,10 @@
 import { defineToolbarApp } from "astro/toolbar";
 import { computePosition, flip, shift, offset, arrow } from "@floating-ui/dom";
 
-const MAX_ANCESTOR_DEPTH = 20;
+const LOG_PREFIX = "[astro-vscode-inspector]";
+const MAX_ANCESTOR_DEPTH = 50;
 const TOOLTIP_OFFSET = 12;
+const TOOLTIP_ID = "dev-inspector-tooltip";
 
 const tooltipRootStyle = [
   "position:absolute",
@@ -54,17 +56,24 @@ function findInspectorElement(start) {
     current = current.parentElement;
     depth += 1;
   }
+  if (depth >= MAX_ANCESTOR_DEPTH) {
+    console.debug(
+      `${LOG_PREFIX} reached MAX_ANCESTOR_DEPTH (${MAX_ANCESTOR_DEPTH}) without inspector attrs — increase if your tree is deeper.`,
+    );
+  }
   return null;
 }
 
 export default defineToolbarApp({
   init(_canvas, app, server) {
+    try {
     let projectFolder = "";
     let editorLabel = "VS Code";
     let endpoint = "/__open-in-editor";
     let inspectorOn = false;
     let highlighted = null;
     let tooltipEl = null;
+    let listenerController = null;
 
     server.on("set-config", (cfg) => {
       projectFolder = cfg.projectFolder || "";
@@ -77,9 +86,14 @@ export default defineToolbarApp({
     });
 
     function ensureTooltip() {
-      if (tooltipEl) return tooltipEl;
+      if (tooltipEl && tooltipEl.isConnected) return tooltipEl;
+      const existing = document.getElementById(TOOLTIP_ID);
+      if (existing) {
+        tooltipEl = existing;
+        return existing;
+      }
       const root = document.createElement("div");
-      root.id = "dev-inspector-tooltip";
+      root.id = TOOLTIP_ID;
       root.style.cssText = tooltipRootStyle;
       const arrowEl = document.createElement("div");
       arrowEl.id = "tooltip-arrow";
@@ -163,9 +177,10 @@ export default defineToolbarApp({
 
     function teardownInspector() {
       inspectorOn = false;
-      document.removeEventListener("click", onDocClick, true);
-      document.removeEventListener("mouseover", onMouseOver, true);
-      document.removeEventListener("mouseout", onMouseOut, true);
+      if (listenerController) {
+        listenerController.abort();
+        listenerController = null;
+      }
       clearHighlight();
       hideTooltip();
       if (tooltipEl) {
@@ -174,39 +189,54 @@ export default defineToolbarApp({
       }
     }
 
-    async function openInEditor(element) {
-      const line = element.getAttribute("data-inspector-line");
-      const column = element.getAttribute("data-inspector-column") || "1";
-      const relativePath = element.getAttribute("data-inspector-relative-path");
-      if (!line || !relativePath) return;
-
-      if (!projectFolder) {
-        console.warn(
-          "astro-vscode-inspector: projectFolder not configured. PUBLIC_PROJECT_FOLDER or projectFolder option.",
-        );
-        return;
-      }
-
-      const rel = normalizePathFragment(relativePath).replace(/^\/+/, "");
-      const root = normalizePathFragment(projectFolder).replace(/\/+$/, "");
-      const absolutePath = `${root}/${rel}`;
-
-      try {
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ file: absolutePath, line, column }),
-        });
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          console.error(`[inspector] server ${res.status}: ${text}`);
-        }
-      } catch (err) {
-        console.error("[inspector] open-in-editor request failed", err);
-      }
-
+    function closeInspector() {
       teardownInspector();
-      app.toggleState({ state: false });
+      try {
+        app.toggleState({ state: false });
+      } catch (err) {
+        console.error(`${LOG_PREFIX} app.toggleState failed`, err);
+      }
+    }
+
+    async function openInEditor(element) {
+      try {
+        const line = element.getAttribute("data-inspector-line");
+        const column = element.getAttribute("data-inspector-column") || "1";
+        const relativePath = element.getAttribute("data-inspector-relative-path");
+        if (!line || !relativePath) {
+          console.error(
+            `${LOG_PREFIX} missing data-inspector-line or data-inspector-relative-path on clicked element`,
+          );
+          return;
+        }
+
+        if (!projectFolder) {
+          console.error(
+            `${LOG_PREFIX} projectFolder not configured. Pass it as integration option or set PUBLIC_PROJECT_FOLDER env var.`,
+          );
+          return;
+        }
+
+        const rel = normalizePathFragment(relativePath).replace(/^\/+/, "");
+        const root = normalizePathFragment(projectFolder).replace(/\/+$/, "");
+        const absolutePath = `${root}/${rel}`;
+
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ file: absolutePath, line, column }),
+          });
+          if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            console.error(`${LOG_PREFIX} server ${res.status}: ${text}`);
+          }
+        } catch (err) {
+          console.error(`${LOG_PREFIX} open-in-editor request failed`, err);
+        }
+      } finally {
+        closeInspector();
+      }
     }
 
     function onDocClick(ev) {
@@ -239,14 +269,23 @@ export default defineToolbarApp({
     app.onToggled(({ state }) => {
       inspectorOn = state;
       if (inspectorOn) {
-        document.addEventListener("click", onDocClick, true);
-        document.addEventListener("mouseover", onMouseOver, true);
-        document.addEventListener("mouseout", onMouseOut, true);
+        if (listenerController) listenerController.abort();
+        listenerController = new AbortController();
+        const { signal } = listenerController;
+        document.addEventListener("click", onDocClick, { capture: true, signal });
+        document.addEventListener("mouseover", onMouseOver, { capture: true, signal });
+        document.addEventListener("mouseout", onMouseOut, { capture: true, signal });
         return;
       }
       teardownInspector();
     });
 
-    console.log("Dev Inspector initialized");
+    console.log(`${LOG_PREFIX} dev inspector initialized`);
+    } catch (err) {
+      console.error(
+        `${LOG_PREFIX} init failed — toolbar app will appear but be non-functional. Cause:`,
+        err,
+      );
+    }
   },
 });

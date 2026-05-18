@@ -1,6 +1,6 @@
 {
   "name": "astro-openvscode-inspector",
-  "version": "1.12.1",
+  "version": "1.13.0",
   "description": "Astro DevToolbar inspector — open components in VS Code, Cursor, JetBrains, Zed, Vim, and other editors supported by launch-editor.",
   "main": "index.js",
   "type": "module",
@@ -39,11 +39,12 @@
   },
   "homepage": "https://github.com/VamoCodar/astro-openvscode-inspector#readme",
   "peerDependencies": {
-    "astro": "^5.0.0"
+    "astro": ">=5.0.0 <7.0.0"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.7.4",
     "launch-editor": "^2.9.1",
+    "shell-quote": "^1.8.1",
     "simple-icons": "^16.18.0"
   },
   "files": [
